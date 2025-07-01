@@ -3,11 +3,10 @@ from ultralytics import YOLO
 from PIL import Image
 import io
 import os
-import datetime
 import logging
 
 app = Flask(__name__)
-model = YOLO("yolov8n.pt")
+model = YOLO("yolov8n-face.pt")
 
 # Configuration du logger
 os.makedirs("logs", exist_ok=True)
@@ -27,24 +26,19 @@ def detect():
     client_id = request.form.get("client_id", "unknown")
 
     if not file:
-        return jsonify({"error": "Aucune image reçue"}), 400
+        return {"error": "Aucune image reçue"}, 400
 
     image = Image.open(io.BytesIO(file.read())).convert("RGB")
     results = model(image, verbose=False)[0]
 
-    detections = []
+    face_boxes = []
     for r in results.boxes.data.tolist():
         x1, y1, x2, y2, conf, cls = r
         label = model.names[int(cls)]
-        detections.append({
-            "label": label,
-            "confidence": f"{conf:.2f}",
-            "bbox": [int(x1), int(y1), int(x2), int(y2)]
-        })
+        if label.lower() == "face":
+            face_boxes.append([int(x1), int(y1), int(x2), int(y2)])
 
-    logging.info(f"{client_id} - {len(detections)} détections - {[d['label'] for d in detections]}")
-
-    return jsonify(detections)
+    return jsonify({"faces": face_boxes})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

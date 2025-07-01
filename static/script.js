@@ -12,23 +12,43 @@ const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const statusText = document.getElementById("status");
-let lastDetections = [];
+let lastFaceBoxes = [];
+const MARGIN = 30; // marge en pixels autour du visage
 function drawVideoLoop() {
     if (video.readyState === 4) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         ctx.drawImage(video, 0, 0);
-        lastDetections.forEach((obj) => {
-            const [x1, y1, x2, y2] = obj.bbox;
-            ctx.strokeStyle = "red";
-            ctx.lineWidth = 2;
-            ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
-            ctx.fillStyle = "red";
-            ctx.font = "14px Arial";
-            ctx.fillText(`${obj.label} (${obj.confidence})`, x1 + 4, y1 + 14);
+        // Flouter les visages détectés avec une marge
+        lastFaceBoxes.forEach(([x1, y1, x2, y2]) => {
+            const nx1 = Math.max(0, x1 - MARGIN);
+            const ny1 = Math.max(0, y1 - MARGIN);
+            const nx2 = Math.min(canvas.width, x2 + MARGIN);
+            const ny2 = Math.min(canvas.height, y2 + MARGIN);
+            blurRect(ctx, nx1, ny1, nx2 - nx1, ny2 - ny1);
         });
     }
     requestAnimationFrame(drawVideoLoop);
+}
+// Fonction pour flouter une zone du canvas
+function blurRect(ctx, x, y, w, h) {
+    try {
+        // Copier la zone à flouter
+        const imageData = ctx.getImageData(x, y, w, h);
+        // Créer un canvas temporaire
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = w;
+        tempCanvas.height = h;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.putImageData(imageData, 0, 0);
+        // Appliquer un flou CSS (plus rapide que JS pur)
+        tempCtx.filter = 'blur(12px)';
+        tempCtx.drawImage(tempCanvas, 0, 0);
+        // Remettre la zone floutée sur le canvas principal
+        ctx.drawImage(tempCanvas, x, y);
+    } catch (e) {
+        // Ignore les erreurs sur les bords
+    }
 }
 async function initWebcam() {
     try {
@@ -66,8 +86,8 @@ function startDetectionLoop() {
             })
                 .then((res) => res.json())
                 .then((data) => {
-                    lastDetections = data;
-                    statusText.textContent = `Détections : ${data.length}`;
+                    lastFaceBoxes = data.faces || [];
+                    statusText.textContent = `Visages détectés : ${lastFaceBoxes.length}`;
                 })
                 .catch((err) => {
                     console.error("Erreur API :", err);

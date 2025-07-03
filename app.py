@@ -4,7 +4,6 @@ from PIL import Image
 import io
 import os
 import logging
-from deepface import DeepFace
 from collections import Counter
 import numpy as np
 
@@ -60,70 +59,14 @@ def detect():
             "bbox": [int(x1), int(y1), int(x2), int(y2)]
         })
 
-    # Analyse DeepFace sur le premier visage détecté
-    description = None
-    lunettes = False
-    barbe = False
-    cheveux = None
-    if face_boxes:
-        x1, y1, x2, y2 = face_boxes[0]
-        face_crop = image.crop((x1, y1, x2, y2))
-        try:
-            face_np = np.array(face_crop)
-            analysis = DeepFace.analyze(face_np, actions=["age", "gender", "emotion", "race"], enforce_detection=False)
-            if isinstance(analysis, list):
-                analysis = analysis[0]
-            cheveux = analysis.get("dominant_race", None)
-            description = {
-                "age": int(analysis["age"]),
-                "gender": analysis["gender"],
-                "dominant_emotion": analysis["dominant_emotion"],
-                "cheveux": cheveux,
-                "lunettes": lunettes,
-                "barbe": barbe
-            }
-        except Exception as e:
-            description = {"error": str(e)}
-
     # Couleur dominante du haut (vêtements)
-    couleur_haut = None
-    couleur_haut_nom = None
-    if pose_keypoints:
-        # On prend la première personne détectée
-        kp = pose_keypoints[0]
-        # Keypoints COCO: 5 = épaule gauche, 6 = épaule droite, 11 = hanche gauche, 12 = hanche droite
-        try:
-            xg, yg = kp[5]
-            xd, yd = kp[6]
-            xhg, yhg = kp[11]
-            xhd, yhd = kp[12]
-            # On définit un rectangle entre les épaules et les hanches
-            x1 = int(min(xg, xd, xhg, xhd))
-            x2 = int(max(xg, xd, xhg, xhd))
-            y1 = int(min(yg, yd))
-            y2 = int(max(yhg, yhd))
-            if x2 > x1 and y2 > y1:
-                crop = image.crop((x1, y1, x2, y2))
-                arr = np.array(crop).reshape(-1, 3)
-                # On ignore les pixels très sombres/clairs (fond)
-                arr = arr[(arr[:,0]>30) & (arr[:,1]>30) & (arr[:,2]>30)]
-                if len(arr) > 0:
-                    # On prend la couleur la plus fréquente
-                    most_common = Counter([tuple(c) for c in arr]).most_common(1)[0][0]
-                    couleur_haut = f"rgb{most_common}"
-                    couleur_haut_nom = rgb_to_name(most_common)
-        except Exception as e:
-            couleur_haut = None
-            couleur_haut_nom = None
-    if description is not None:
-        description["couleur_haut"] = couleur_haut_nom or couleur_haut
-    else:
-        description = {"couleur_haut": couleur_haut_nom or couleur_haut}
+    # (SUPPRIMÉ) couleur_haut, couleur_haut_nom, description
 
     TOLERANCE = 100  # pixels
     bras_leve = False
     bras_leve_bottle = False
     bras_leve_scissors = False
+    bras_leve_cellphone = False
     for kp in pose_results.keypoints.xy:
         x_shoulder_g, y_shoulder_g = kp[5]
         x_wrist_g, y_wrist_g = kp[7]
@@ -141,6 +84,10 @@ def detect():
                     if (x1-TOLERANCE <= x_wrist_g <= x2+TOLERANCE and y1-TOLERANCE <= y_wrist_g <= y2+TOLERANCE) or \
                        (x1-TOLERANCE <= x_wrist_d <= x2+TOLERANCE and y1-TOLERANCE <= y_wrist_d <= y2+TOLERANCE):
                         bras_leve_scissors = True
+                if obj["label"] == "cell phone":
+                    if (x1-TOLERANCE <= x_wrist_g <= x2+TOLERANCE and y1-TOLERANCE <= y_wrist_g <= y2+TOLERANCE) or \
+                       (x1-TOLERANCE <= x_wrist_d <= x2+TOLERANCE and y1-TOLERANCE <= y_wrist_d <= y2+TOLERANCE):
+                        bras_leve_cellphone = True
             break
 
     knife_detected = False
@@ -154,8 +101,8 @@ def detect():
         "bras_leve": bras_leve,
         "bras_leve_bottle": bras_leve_bottle,
         "bras_leve_scissors": bras_leve_scissors,
+        "bras_leve_cellphone": bras_leve_cellphone,
         "poses": pose_keypoints,
-        "description": description,
         "knife_detected": knife_detected
     })
 

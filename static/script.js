@@ -18,6 +18,7 @@ const MARGIN = 30; // marge en pixels autour du visage
 let brasLeve = false;
 let brasLeveBouteille = false;
 let brasLeveScissors = false;
+let brasLeveCellphone = false;
 let lastPoses = [];
 function drawVideoLoop() {
     if (video.readyState === 4) {
@@ -95,15 +96,10 @@ function startDetectionLoop() {
                     brasLeve = data.bras_leve || false;
                     brasLeveBouteille = data.bras_leve_bottle || false;
                     brasLeveScissors = data.bras_leve_scissors || false;
+                    brasLeveCellphone = data.bras_leve_cellphone || false;
                     lastPoses = data.poses || [];
-                    // Affichage de la description physique
-                    if (data.description) {
-                        descriptionDiv.innerHTML = buildDescription(
-                            data.description, brasLeve, brasLeveBouteille, brasLeveScissors, data.knife_detected
-                        );
-                    } else {
-                        descriptionDiv.innerHTML = '';
-                    }
+                    // Affichage uniquement des alertes
+                    descriptionDiv.innerHTML = buildDescription({}, brasLeve, brasLeveBouteille, brasLeveScissors, brasLeveCellphone, data.knife_detected);
                     // Statut simple (nombre de visages)
                     statusText.textContent = `Visages détectés : ${lastFaceBoxes.length}`;
                     statusText.style.background = "linear-gradient(90deg, #6366f1 0%, #818cf8 100%)";
@@ -128,16 +124,8 @@ function getAgeRange(age) {
     if (age < 70) return '60-69 ans';
     return '70 ans et +';
 }
-function buildDescription(desc, brasLeve, brasLeveBouteille, brasLeveScissors, knifeDetected) {
-    let html = `<strong>Description :</strong><br>`;
-    if (desc.gender && typeof desc.gender === 'string') html += `${desc.gender}, `;
-    if (desc.age) html += `Tranche d'âge : ${getAgeRange(desc.age)}<br>`;
-    if (desc.cheveux) html += `Cheveux/teint : ${desc.cheveux}<br>`;
-    if (desc.lunettes) html += `Lunettes<br>`;
-    if (desc.barbe) html += `Barbe<br>`;
-    if (desc.couleur_haut) html += `Haut : ${desc.couleur_haut}<br>`;
-    if (desc.dominant_emotion) html += `Émotion : ${desc.dominant_emotion}<br>`;
-    if (desc.error) html += `<span style='color:red'>Erreur analyse visage</span><br>`;
+function buildDescription(desc, brasLeve, brasLeveBouteille, brasLeveScissors, brasLeveCellphone, knifeDetected) {
+    let html = '';
     // Ajout des messages d'alerte/détection
     if (knifeDetected) {
         html += `<div style='color:#fff; background:#ff1744; border-radius:8px; padding:6px 12px; margin-top:10px; font-weight:bold;'>⚠️ COUTEAU DÉTECTÉ !</div>`;
@@ -145,6 +133,8 @@ function buildDescription(desc, brasLeve, brasLeveBouteille, brasLeveScissors, k
         html += `<div style='color:#fff; background:#ff9800; border-radius:8px; padding:6px 12px; margin-top:10px; font-weight:bold;'>Bras levé + bouteille détectée !</div>`;
     } else if (brasLeveScissors) {
         html += `<div style='color:#fff; background:#7c3aed; border-radius:8px; padding:6px 12px; margin-top:10px; font-weight:bold;'>Bras levé + ciseaux détectés !</div>`;
+    } else if (brasLeveCellphone) {
+        html += `<div style='color:#fff; background:#2196f3; border-radius:8px; padding:6px 12px; margin-top:10px; font-weight:bold;'>Bras levé + téléphone détecté !</div>`;
     } else if (brasLeve) {
         html += `<div style='color:#fff; background:#00c853; border-radius:8px; padding:6px 12px; margin-top:10px; font-weight:bold;'>Bras levé !</div>`;
     }

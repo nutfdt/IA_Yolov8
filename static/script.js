@@ -12,8 +12,13 @@ const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const statusText = document.getElementById("status");
+const descriptionDiv = document.getElementById("description");
 let lastFaceBoxes = [];
 const MARGIN = 30; // marge en pixels autour du visage
+let brasLeve = false;
+let brasLeveBouteille = false;
+let brasLeveScissors = false;
+let lastPoses = [];
 function drawVideoLoop() {
     if (video.readyState === 4) {
         canvas.width = video.videoWidth;
@@ -87,7 +92,22 @@ function startDetectionLoop() {
                 .then((res) => res.json())
                 .then((data) => {
                     lastFaceBoxes = data.faces || [];
+                    brasLeve = data.bras_leve || false;
+                    brasLeveBouteille = data.bras_leve_bottle || false;
+                    brasLeveScissors = data.bras_leve_scissors || false;
+                    lastPoses = data.poses || [];
+                    // Affichage de la description physique
+                    if (data.description) {
+                        descriptionDiv.innerHTML = buildDescription(
+                            data.description, brasLeve, brasLeveBouteille, brasLeveScissors, data.knife_detected
+                        );
+                    } else {
+                        descriptionDiv.innerHTML = '';
+                    }
+                    // Statut simple (nombre de visages)
                     statusText.textContent = `Visages détectés : ${lastFaceBoxes.length}`;
+                    statusText.style.background = "linear-gradient(90deg, #6366f1 0%, #818cf8 100%)";
+                    statusText.style.color = "#fff";
                 })
                 .catch((err) => {
                     console.error("Erreur API :", err);
@@ -95,6 +115,40 @@ function startDetectionLoop() {
                 });
         }, "image/jpeg");
     }, 1000);
+}
+function getAgeRange(age) {
+    if (!age || isNaN(age)) return '';
+    age = parseInt(age);
+    if (age < 13) return 'enfant';
+    if (age < 20) return '14-19 ans';
+    if (age < 30) return '20-29 ans';
+    if (age < 40) return '30-39 ans';
+    if (age < 50) return '40-49 ans';
+    if (age < 60) return '50-59 ans';
+    if (age < 70) return '60-69 ans';
+    return '70 ans et +';
+}
+function buildDescription(desc, brasLeve, brasLeveBouteille, brasLeveScissors, knifeDetected) {
+    let html = `<strong>Description :</strong><br>`;
+    if (desc.gender && typeof desc.gender === 'string') html += `${desc.gender}, `;
+    if (desc.age) html += `Tranche d'âge : ${getAgeRange(desc.age)}<br>`;
+    if (desc.cheveux) html += `Cheveux/teint : ${desc.cheveux}<br>`;
+    if (desc.lunettes) html += `Lunettes<br>`;
+    if (desc.barbe) html += `Barbe<br>`;
+    if (desc.couleur_haut) html += `Haut : ${desc.couleur_haut}<br>`;
+    if (desc.dominant_emotion) html += `Émotion : ${desc.dominant_emotion}<br>`;
+    if (desc.error) html += `<span style='color:red'>Erreur analyse visage</span><br>`;
+    // Ajout des messages d'alerte/détection
+    if (knifeDetected) {
+        html += `<div style='color:#fff; background:#ff1744; border-radius:8px; padding:6px 12px; margin-top:10px; font-weight:bold;'>⚠️ COUTEAU DÉTECTÉ !</div>`;
+    } else if (brasLeveBouteille) {
+        html += `<div style='color:#fff; background:#ff9800; border-radius:8px; padding:6px 12px; margin-top:10px; font-weight:bold;'>Bras levé + bouteille détectée !</div>`;
+    } else if (brasLeveScissors) {
+        html += `<div style='color:#fff; background:#7c3aed; border-radius:8px; padding:6px 12px; margin-top:10px; font-weight:bold;'>Bras levé + ciseaux détectés !</div>`;
+    } else if (brasLeve) {
+        html += `<div style='color:#fff; background:#00c853; border-radius:8px; padding:6px 12px; margin-top:10px; font-weight:bold;'>Bras levé !</div>`;
+    }
+    return html;
 }
 document.addEventListener("DOMContentLoaded", () => {
     initWebcam();

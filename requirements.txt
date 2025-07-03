@@ -3,4 +3,5 @@ ultralytics
 pillow
 gunicorn
 flask-cors
-opencv-python 
+opencv-python
+tf-keras 
